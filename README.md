@@ -30,7 +30,7 @@ Con el siguiente comando crearemos la red para el contenedor.
 Lo siguiente será lanzar el docker que usaremos para tener la base de datos, en el siguiente comando uso una imagen personalizada creada por mi para este proyecto que ya cuenta con xampp instalado.
 
 ```bash
-    docker run -it --name backdocker -p 8080:80 -p 8081:3306 -p 8000:8000 --ip 172.79.0.3 --network red1 -v ../WellnessTrack-api:/home/docker hehedaniel/backcompleto:backfuncional
+    docker run -it --name backdocker -p 8080:80 -p 8081:3306 -p 8000:8000 --ip 172.79.0.3 --network red1 -v ../WellnessTrack-api:/home/docker hehedaniel/backcompleto:backterminado
 ```
 
 Hecho estos comandos deberemos haber entrado al contenedor, una vez dentro deberemos ejecutar:
