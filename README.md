@@ -7,14 +7,14 @@ Este repositorio cuenta con el proyecto creado con Symfony usando Doctrine, el c
 Para el correcto funcionamiento del proyecto es necesario:
 
 - Symfony, usado v5.8.19
-- Doctrine, usado v
+- Doctrine
 - Php, usado v8.2.10
-- Composer,
+- Composer, v2.7.1
 
 Ya que aquí se encuentra la conexión con la base de datos:
 
 - Xampp, usado v8.2.12
-- Doctrine desktop, usado v 4.29
+- Docker desktop, usado v 4.29
 
 ## Ejecución
 
