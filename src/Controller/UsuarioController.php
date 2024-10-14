@@ -19,7 +19,7 @@ class UsuarioController extends AbstractController
 {
    /**
     * @Route("/", name="app_usuario_index", methods={"GET"})
-    *
+    * @Route("", name="app_usuario_index_no_slash", methods={"GET"})
     * Método para obtener todos los usuarios registrados
     * @param UsuarioRepository $usuarioRepository
     * @return Response con los usuarios en formato JSON
