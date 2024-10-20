@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Ejercicio;
+use App\Entity\UsuarioRealizaEjercicio;
 use App\Repository\EjercicioRepository;
+use App\Repository\EnlaceRepository;
 use App\Repository\UsuarioRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -11,6 +13,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 use App\Util\RespuestaController;
+use App\Util\CbbddConsultas;
+use App\Entity\Enlace;
 
 /**
  * @Route("/ejercicio")
@@ -69,9 +73,48 @@ class EjercicioController extends AbstractController
     }
 
     /**
+     * @Route("/nombreConEnlaces", name="app_ejercicio_buscarnombre", methods={"POST"})
+     */
+    public function buscarnombre(Request $request, EnlaceRepository $enlaceRepository, EjercicioRepository $ejercicioRepository): Response
+    {
+        $data = json_decode($request->getContent(), true);
+
+        if (!isset($data["nombre"])) {
+            return RespuestaController::format("400", "No se ha recibido el nombre del ejercicio");
+        }
+
+        $nombreBuscar = $data["nombre"];
+
+        $cbbdd = new CbbddConsultas();
+        $ejerciciosEncontrados = $cbbdd->consulta("SELECT * FROM ejercicio WHERE nombre LIKE '%$nombreBuscar%'");
+        if (!$ejerciciosEncontrados) {
+            // Cambié el código de respuesta por un 404 porque no se encuentra el ejercicio.
+            return RespuestaController::format("404", "No se ha encontrado el ejercicio");
+        } else {
+            $ejerciciosConEnlaces = []; // Inicializar correctamente el array vacío
+            foreach ($ejerciciosEncontrados as $ejercicionuevo) {
+                $ejercicioDevolver = new Ejercicio();
+                $ejercicioDevolver->setId($ejercicionuevo["id"]);
+                $ejercicioDevolver->setNombre($ejercicionuevo["nombre"]);
+                $ejercicioDevolver->setDescripcion($ejercicionuevo["descripcion"]);
+                $ejercicioDevolver->setGrupoMuscular($ejercicionuevo["grupo_muscular"]);
+                $ejercicioDevolver->setDificultad($ejercicionuevo["dificultad"]);
+                $ejercicioDevolver->setInstrucciones($ejercicionuevo["instrucciones"]);
+                $ejercicioDevolver->setValorMET($ejercicionuevo["valor_met"]);
+                $ejercicioDevolver->setIdUsuario(null);
+
+                // Añadir el ejercicio con los enlaces al array
+                $ejerciciosConEnlaces[] = $this->ejercicioConEnlaceJSON($ejercicioDevolver, $enlaceRepository, $ejercicioRepository);
+            }
+            return RespuestaController::format("200", $ejerciciosConEnlaces);
+        }
+    }
+
+
+    /**
      * @Route("/crear", name="app_ejercicio_crear", methods={"POST"})
      */
-    public function crear(Request $request, EjercicioRepository $ejercicioRepository, UsuarioRepository $usuasrioRepository): Response
+    public function crear(Request $request, EjercicioRepository $ejercicioRepository, UsuarioRepository $usuasrioRepository, EnlaceRepository $enlaceRepository): Response
     {
         $data = json_decode($request->getContent(), true);
 
@@ -96,7 +139,20 @@ class EjercicioController extends AbstractController
 
         $ejercicioRepository->add($ejercicio, true);
 
-        $ejercicioJSON = $this->ejercicioJSON($ejercicio);
+        //Aqui ya he guardado el ejercicio en la base de datos, ahora debo añadir los enlaces
+        //Como se que unicamente son 2 enlaces, los añado directamente
+        $enlace1 = new Enlace();
+        $enlace1->setEnlace($data['enlace1']);
+        $enlace1->setIdEjercicio($ejercicio);
+        $enlaceRepository->add($enlace1, true);
+
+        $enlace2 = new Enlace();
+        $enlace2->setEnlace($data['enlace2']);
+        $enlace2->setIdEjercicio($ejercicio);
+        $enlaceRepository->add($enlace2, true);
+
+        // Devolver el ejercicio creado en formato JSON con los enlaces
+        $ejercicioJSON = $this->ejercicioConEnlaceJSON($ejercicio, $enlaceRepository, $ejercicioRepository);
 
         return RespuestaController::format("200", $ejercicioJSON);
     }
@@ -148,7 +204,7 @@ class EjercicioController extends AbstractController
         if (isset($data['id'])) {
             // Buscar ejercicio por ID
             $ejercicio = $ejercicioRepository->find($data['id']);
-        }else {
+        } else {
             return RespuestaController::format("400", "ID no recibidos");
         }
 
@@ -159,6 +215,41 @@ class EjercicioController extends AbstractController
         $ejercicioRepository->remove($ejercicio, true);
 
         return RespuestaController::format("200", "Ejercicio eliminado correctamente");
+    }
+
+    private function ejercicioConEnlaceJSON(Ejercicio $ejercicio, EnlaceRepository $enlaceRepository, EjercicioRepository $ejercicioRepository)
+    {
+        // Buscar los enlaces usando la relación 'idEjercicio'
+        $enlaces = $enlaceRepository->findBy(["idEjercicio" => $ejercicio->getId()]);
+
+        // Si no hay enlaces, devolver un mensaje de error
+        if (!$enlaces) {
+            return RespuestaController::format("404", "No existen enlaces para este ejercicio");
+        }
+
+        // Crear un array para almacenar los enlaces formateados
+        $enlacesFormateados = [];
+        foreach ($enlaces as $enlace) {
+            $enlacesFormateados[] = [
+                "id" => $enlace->getId(),
+                "url" => $enlace->getEnlace() // Asegúrate de que 'getEnlace()' sea el método correcto para obtener la URL del enlace
+            ];
+        }
+
+        // Crear el arreglo con los detalles del ejercicio y sus enlaces
+        $ejercicioConEnlaceJSON = [
+            "id" => $ejercicio->getId(),
+            "nombre" => $ejercicio->getNombre(),
+            "descripcion" => $ejercicio->getDescripcion(),
+            "grupoMuscular" => $ejercicio->getGrupoMuscular(),
+            "dificultad" => $ejercicio->getDificultad(),
+            "instrucciones" => $ejercicio->getInstrucciones(),
+            "valorMET" => $ejercicio->getValorMET(),
+            "idUsuario" => $ejercicio->getIdUsuario() ? $ejercicio->getIdUsuario()->getId() : null,
+            "enlaces" => $enlacesFormateados // Devolver la lista de enlaces formateados
+        ];
+
+        return $ejercicioConEnlaceJSON;
     }
 
     // Función para convertir un objeto Ejercicio a formato JSON
@@ -177,4 +268,5 @@ class EjercicioController extends AbstractController
 
         return $ejercicioJSON;
     }
+
 }

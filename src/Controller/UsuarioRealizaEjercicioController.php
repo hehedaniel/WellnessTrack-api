@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 use App\Util\RespuestaController;
+use App\Util\CbbddConsultas;
 
 /**
  * @Route("/usuariorealizaejercicio")
@@ -63,9 +64,23 @@ class UsuarioRealizaEjercicioController extends AbstractController
       $data = json_decode($request->getContent(), true);
 
       $usuarioRealizaEjercicio = new UsuarioRealizaEjercicio();
-      $usuarioRealizaEjercicio->setFecha(new \DateTime($data['fecha']));
-      $usuarioRealizaEjercicio->setHora(new \DateTime($data['hora']));
-      $usuarioRealizaEjercicio->setCalorias($data['calorias']);
+      //Aqui obtengo la fecha y hora actual formateadas a DD-MM-YYYY y HH:MM:SS
+      $fechaActual = new \DateTime();
+      $fecha = new \DateTime($fechaActual->format('Y-m-d'));
+      $hora = new \DateTime($fechaActual->format('H:i:s'));
+
+      //Le añado la fecha y hora al objeto
+      $usuarioRealizaEjercicio->setFecha($fecha);
+      $usuarioRealizaEjercicio->setHora($hora);
+
+      //Aqui obtengo el peso del usuario a partir de su id
+      $peso = $this->obtenerUltimoPeso($data['idUsuario']);
+
+      //Aqui calculo las calorias quemadas
+      $calorias = $data['met'] * $peso * $data['tiempo'];
+
+
+      $usuarioRealizaEjercicio->setCalorias($calorias);
       $usuarioRealizaEjercicio->setTiempo($data['tiempo']);
 
       $usuarioRealizaEjercicio->setIdEjercicio($ejercicioRepository->find($data['idEjercicio']));
@@ -166,6 +181,25 @@ class UsuarioRealizaEjercicioController extends AbstractController
          "idUsuario" => $usuarioRealizaEjercicio->getIdUsuario(),
       ];
    }
+
+   public function obtenerUltimoPeso(string $idUsuario): string
+   {
+       $cbbdd = new CbbddConsultas();
+       $ultimoPeso = $cbbdd->consulta("
+           SELECT *
+           FROM peso
+           WHERE id_usuario_id = '$idUsuario'
+           ORDER BY fecha DESC, hora DESC
+           LIMIT 1
+       ");
+
+       if (!$ultimoPeso) {
+           return '0';
+       }
+   
+       return $ultimoPeso[0]["peso"];
+   }
+   
 
    /**
     * Método para convertir un objeto UsuarioRealizaEjercicio en un array JSON
