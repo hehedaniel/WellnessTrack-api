@@ -6,6 +6,7 @@ use App\Entity\UsuarioRealizaEjercicio;
 use App\Repository\EjercicioRepository;
 use App\Repository\UsuarioRealizaEjercicioRepository;
 use App\Repository\UsuarioRepository;
+use Proxies\__CG__\App\Entity\Ejercicio;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -92,7 +93,7 @@ class UsuarioRealizaEjercicioController extends AbstractController
    }
 
    /**
-    * @Route("/eliminar", name="usuario_realiza_ejercicio_eliminar", methods={"DELETE"})
+    * @Route("/eliminar", name="usuario_realiza_ejercicio_eliminar", methods={"DELETE", "POST"})
     *
     * Método para eliminar un ejercicio realizado por un usuario
     * @param Request $request
@@ -129,7 +130,7 @@ class UsuarioRealizaEjercicioController extends AbstractController
     * @param UsuarioRealizaEjercicioRepository $usuarioRealizaEjercicioRepository
     * @return Response con el mensaje de éxito o error
     */
-   public function editar(Request $request, UsuarioRealizaEjercicioRepository $usuarioRealizaEjercicioRepository): Response
+   public function editar(Request $request, UsuarioRealizaEjercicioRepository $usuarioRealizaEjercicioRepository, EjercicioRepository $ejercicioRepository): Response
    {
       $data = json_decode($request->getContent(), true);
 
@@ -142,7 +143,7 @@ class UsuarioRealizaEjercicioController extends AbstractController
             "idUsuario" => $data['idUsuario'],
             "fecha" => new \DateTime($data['fecha']),
             "hora" => new \DateTime($data['hora']),
-            "idEjercicio" => $data['idEjercicio']
+            "idEjercicio" => $data['idEjercicioViejo']
          ]
       );
 
@@ -150,7 +151,23 @@ class UsuarioRealizaEjercicioController extends AbstractController
          return RespuestaController::format("404", "No existe el ejercicio a editar");
       }
 
-      $usuarioRealizaEjercicio->setCalorias($data['calorias']);
+      //Busco el ejercicio nuevo
+      $ejercicioNuevo = $ejercicioRepository->find($data['idEjercicioNuevo']);
+      if (!$ejercicioNuevo) {
+         return RespuestaController::format("404", "No existe el ejercicio nuevo");
+      }
+
+      $usuarioRealizaEjercicio->setIdEjercicio($ejercicioNuevo);
+
+      //Aqui obtengo el peso del usuario a partir de su id
+      $peso = $this->obtenerUltimoPeso($data['idUsuario']);
+
+      //Aqui calculo las calorias quemadas
+      $calorias = $data['met'] * $peso * $data['tiempo'];
+
+
+      $usuarioRealizaEjercicio->setCalorias($calorias);
+
       $usuarioRealizaEjercicio->setTiempo($data['tiempo']);
 
       $usuarioRealizaEjercicioRepository->add($usuarioRealizaEjercicio, true);
@@ -184,8 +201,8 @@ class UsuarioRealizaEjercicioController extends AbstractController
 
    public function obtenerUltimoPeso(string $idUsuario): string
    {
-       $cbbdd = new CbbddConsultas();
-       $ultimoPeso = $cbbdd->consulta("
+      $cbbdd = new CbbddConsultas();
+      $ultimoPeso = $cbbdd->consulta("
            SELECT *
            FROM peso
            WHERE id_usuario_id = '$idUsuario'
@@ -193,13 +210,13 @@ class UsuarioRealizaEjercicioController extends AbstractController
            LIMIT 1
        ");
 
-       if (!$ultimoPeso) {
-           return '0';
-       }
-   
-       return $ultimoPeso[0]["peso"];
+      if (!$ultimoPeso) {
+         return '0';
+      }
+
+      return $ultimoPeso[0]["peso"];
    }
-   
+
 
    /**
     * Método para convertir un objeto UsuarioRealizaEjercicio en un array JSON
